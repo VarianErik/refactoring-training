@@ -12,93 +12,102 @@ namespace Refactoring
     {
         public static void Start(List<User> users, List<Product> products)
         {
+            bool validUser = false;
+            bool validPassword = false;
+            string userName = String.Empty;
+            string password = String.Empty;
+            double userBalance = 0;
+
             ShowInitialGreeting();
 
             Login:
 
-            string userName = UsernamePrompt();
+            userName = UsernamePrompt();
 
             // Validate Username
-            bool validUser = false;
+            
             if (!string.IsNullOrEmpty(userName))
             {
                 validUser = VerifyUserExists(users, userName, validUser);
 
                 if (validUser)
                 {
-                    string password = PasswordPrompt();
-
-                    // Validate Password
-                    bool validPassword = false;
+                    password = PasswordPrompt();
+                    
                     validPassword = VerifyPassword(users, userName, password, validPassword);
 
                     if (validPassword)
                     {
-                        ShowWelcomeMessage(userName);
+                        ShowWelcomeMessage(userName);                        
                         
-                        double userBalance = 0;
                         userBalance = ShowRemainingBalance(users, userName, password, userBalance);
 
-                        // Show product list
-                        while (true)
-                        {
-                            string answer;
-                            int productChosen;
-
-                            ShowProductList(products);
-                            PromptUserToChooseProduct(out answer, out productChosen);
-                            //subtract 1 for zero based index
-                            productChosen = productChosen - 1; 
-
-                            // Check if user entered number that equals product count
-                            if (productChosen == products.Count)
-                            {
-                                PrepareToClose(users, products, userName, password, userBalance);
-                                return;
-                            }
-                            else
-                            {
-                                int quantityRemaining = PromptAmountToPurchase(products, userBalance, ref answer, productChosen);
-
-                                if (isBalanceLessThanZero(products, userBalance, productChosen, quantityRemaining))
-                                {
-                                    InsufficientMoniesForPurchase();
-                                    continue;
-                                }
-
-                                if (isNotEnoughProductForOrder(products, productChosen, quantityRemaining))
-                                {
-                                    NotEnoughProductMessage(products, productChosen);
-                                    continue;
-                                }
-
-                                if (quantityRemaining >= 0)
-                                {
-                                    FinalizeSale(products, userBalance, productChosen, quantityRemaining);
-                                }
-                                else
-                                {
-                                    OutOfStock();
-                                }
-                            }
-                        }
+                        PurchaseProduct(users, products, userName, password, userBalance);
+                        return;
                     }
                     else
                     {
                         InvalidPasswordProvided();
-
                         goto Login;
                     }
                 }
                 else
                 {
                     InvalidUserProvided();
-
                     goto Login;
                 }
             }
 
-            // Prevent console from closing
+            PreventConsoleFromClosing();
+        }
+
+        private static void PurchaseProduct(List<User> users, List<Product> products, string userName, string password, double userBalance)
+        {
+            while (true)
+            {
+                string answer;
+                int productChosen;
+
+                ShowProductList(products);
+                PromptUserToChooseProduct(out answer, out productChosen);
+
+                // Product count is exit option
+                if (productChosen == products.Count)
+                {
+                    PrepareToClose(users, products, userName, password, userBalance);
+                    return;
+                }
+                else
+                {
+
+                    int quantityToPurchase = PromptAmountToPurchase(products, userBalance, ref answer, productChosen);
+
+                    if (isBalanceLessThanZero(products, userBalance, productChosen, quantityToPurchase))
+                    {
+                        InsufficientMoniesForPurchase();
+                        continue;
+                    }
+
+                    if (isNotEnoughProductForOrder(products, productChosen, quantityToPurchase))
+                    {
+                        NotEnoughProductMessage(products, productChosen);
+                        continue;
+                    }
+
+                    if (quantityToPurchase > 0)
+                    {
+                        FinalizeSale(products, userBalance, productChosen, quantityToPurchase);
+                    }
+                    else
+                    {
+                        UserCancelledPurchase();
+                    }
+                }
+            }
+        }
+
+        private static void PreventConsoleFromClosing()
+        {
             Console.WriteLine();
             Console.WriteLine("Press Enter key to exit");
             Console.ReadLine();
@@ -136,11 +145,13 @@ namespace Refactoring
             }
         }
 
-        private static void PromptUserToChooseProduct(out string answer, out int num)
+        private static void PromptUserToChooseProduct(out string answer, out int productChosen)
         {
             Console.WriteLine("Enter a number:");
             answer = Console.ReadLine();
-            num = Convert.ToInt32(answer);
+            productChosen = Convert.ToInt32(answer);
+            //subtract 1 for zero based index
+            productChosen = productChosen - 1; 
         }
 
         private static void ShowProductList(List<Product> prods)
@@ -245,9 +256,9 @@ namespace Refactoring
             Console.ResetColor();
         }
 
-        private static bool isNotEnoughProductForOrder(List<Product> prods, int num, int qty)
+        private static bool isNotEnoughProductForOrder(List<Product> prods, int productChosen, int quantityToPurchase)
         {
-            return prods[num].Qty <= qty;
+            return prods[productChosen].Qty <= quantityToPurchase;
         }
 
         private static bool isBalanceLessThanZero(List<Product> prods, double bal, int num, int qty)
@@ -275,7 +286,7 @@ namespace Refactoring
             return bal;
         }
 
-        private static void OutOfStock()
+        private static void UserCancelledPurchase()
         {
             Console.Clear();
             Console.ForegroundColor = ConsoleColor.Yellow;
@@ -321,11 +332,7 @@ namespace Refactoring
             string json2 = JsonConvert.SerializeObject(products, Formatting.Indented);
             File.WriteAllText(@"Data\Products.json", json2);
 
-
-            // Prevent console from closing
-            Console.WriteLine();
-            Console.WriteLine("Press Enter key to exit");
-            Console.ReadLine();
+            PreventConsoleFromClosing();
         }
     }
 }
